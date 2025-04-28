@@ -16,30 +16,22 @@ st.markdown("""
 ✨ *ارفع ملف التقييمات، وأدخل رابط فيد المنتجات من المتجر، وخذ رابط XML النهائي لرفعه في Google Merchant.*
 """)
 
-def safe(value):
-    return html.escape(str(value)) if value else ""
-
-# رفع ملف التقييمات
 uploaded_file = st.file_uploader("📄 ارفع ملف التقييمات (Excel)", type=["xlsx"])
 feed_url = st.text_input("🔗 أدخل رابط فيد المنتجات (XML)")
 
-# الوظيفة الأساسية
 if uploaded_file and feed_url:
     try:
         df = pd.read_excel(uploaded_file)
 
-        # التحقق من الأعمدة الأساسية
         required_cols = ["product_name", "review_content", "rating", "reviewer"]
         if not all(col in df.columns for col in required_cols):
             st.error(f"❌ تأكد أن ملف التقييمات يحتوي على الأعمدة التالية: {', '.join(required_cols)}")
             st.stop()
 
-        # تحميل الفيد وتحليله
         feed_resp = requests.get(feed_url)
         feed_tree = etree.fromstring(feed_resp.content)
         items = feed_tree.xpath("//item")
 
-        # تجهيز قاموس للبحث السريع
         products = {}
         for item in items:
             title_el = item.find("{http://base.google.com/ns/1.0}title")
@@ -53,8 +45,8 @@ if uploaded_file and feed_url:
         for _, row in df.iterrows():
             product_name = str(row["product_name"]).strip()
             rating = int(row["rating"])
-            content = str(row["review_content"])
-            reviewer = str(row["reviewer"])
+            content = html.escape(str(row["review_content"]))  # <== Escape
+            reviewer = html.escape(str(row["reviewer"]))        # <== Escape
 
             matched_product_id = products.get(product_name)
             if matched_product_id:
@@ -76,21 +68,19 @@ if uploaded_file and feed_url:
         if unmatched:
             st.warning(f"⚠️ المنتجات التالية لم يتم العثور عليها في الفيد:\n- " + "\n- ".join(unmatched))
 
-        # توليد ملف XML
         root = ET.Element("reviews")
         for review in reviews_data:
             r = ET.SubElement(root, "review")
-            ET.SubElement(r, "review_id").text = safe(review["review_id"])
+            ET.SubElement(r, "review_id").text = review["review_id"]
             reviewer_el = ET.SubElement(r, "reviewer")
-            ET.SubElement(reviewer_el, "name").text = safe(review["reviewer"])
-            ET.SubElement(r, "review_timestamp").text = safe(review["review_timestamp"])
-            ET.SubElement(r, "title").text = safe(review["title"])
-            ET.SubElement(r, "content").text = safe(review["content"])
-            ET.SubElement(r, "review_rating").text = safe(review["review_rating"])
+            ET.SubElement(reviewer_el, "name").text = review["reviewer"]
+            ET.SubElement(r, "review_timestamp").text = review["review_timestamp"]
+            ET.SubElement(r, "title").text = review["title"]
+            ET.SubElement(r, "content").text = review["content"]
+            ET.SubElement(r, "review_rating").text = str(review["review_rating"])
             product_ids_el = ET.SubElement(r, "product_ids")
-            ET.SubElement(product_ids_el, "product_id").text = safe(review["product_id"])
+            ET.SubElement(product_ids_el, "product_id").text = review["product_id"]
 
-        # تحويل XML إلى بايتات
         xml_bytes = BytesIO()
         tree = ET.ElementTree(root)
         tree.write(xml_bytes, encoding="utf-8", xml_declaration=True)
@@ -99,4 +89,4 @@ if uploaded_file and feed_url:
         st.download_button("📥 تحميل ملف XML", data=xml_bytes.getvalue(), file_name="reviews.xml", mime="application/xml")
 
     except Exception as e:
-        st.error(f"حدث خطأ: {str(e)}")
+        st.error(f"❌ حدث خطأ: {str(e)}")
