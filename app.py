@@ -7,6 +7,7 @@ import uuid
 from io import BytesIO
 from lxml import etree
 import random
+import html
 
 st.set_page_config(page_title="Google Reviews XML Generator", layout="centered")
 st.title("🔧 توليد رابط تقييمات Google Merchant")
@@ -14,6 +15,9 @@ st.title("🔧 توليد رابط تقييمات Google Merchant")
 st.markdown("""
 ✨ *ارفع ملف التقييمات، وأدخل رابط فيد المنتجات من المتجر، وخذ رابط XML النهائي لرفعه في Google Merchant.*
 """)
+
+def safe(value):
+    return html.escape(str(value)) if value else ""
 
 # رفع ملف التقييمات
 uploaded_file = st.file_uploader("📄 ارفع ملف التقييمات (Excel)", type=["xlsx"])
@@ -61,7 +65,7 @@ if uploaded_file and feed_url:
                     "review_id": str(uuid.uuid4()),
                     "reviewer": reviewer,
                     "review_timestamp": random_date.strftime("%Y-%m-%dT%H:%M:%S"),
-                    "title": "",  # بإمكانك تعديلها لإضافة عنوان
+                    "title": "",
                     "content": content,
                     "review_rating": rating,
                     "product_id": matched_product_id
@@ -76,15 +80,15 @@ if uploaded_file and feed_url:
         root = ET.Element("reviews")
         for review in reviews_data:
             r = ET.SubElement(root, "review")
-            ET.SubElement(r, "review_id").text = review["review_id"]
+            ET.SubElement(r, "review_id").text = safe(review["review_id"])
             reviewer_el = ET.SubElement(r, "reviewer")
-            ET.SubElement(reviewer_el, "name").text = review["reviewer"]
-            ET.SubElement(r, "review_timestamp").text = review["review_timestamp"]
-            ET.SubElement(r, "title").text = review["title"]
-            ET.SubElement(r, "content").text = review["content"]
-            ET.SubElement(r, "review_rating").text = str(review["review_rating"])
+            ET.SubElement(reviewer_el, "name").text = safe(review["reviewer"])
+            ET.SubElement(r, "review_timestamp").text = safe(review["review_timestamp"])
+            ET.SubElement(r, "title").text = safe(review["title"])
+            ET.SubElement(r, "content").text = safe(review["content"])
+            ET.SubElement(r, "review_rating").text = safe(review["review_rating"])
             product_ids_el = ET.SubElement(r, "product_ids")
-            ET.SubElement(product_ids_el, "product_id").text = review["product_id"]
+            ET.SubElement(product_ids_el, "product_id").text = safe(review["product_id"])
 
         # تحويل XML إلى بايتات
         xml_bytes = BytesIO()
